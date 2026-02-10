@@ -165,10 +165,6 @@ h2{font-size:20px;margin-bottom:16px;font-weight:700}
         <div class="stat-num" style="color:var(--err)" id="review-count">0</div>
         <div class="stat-label">复习本 ▸</div>
       </div>
-      <div class="stat-box">
-        <div class="stat-num" id="today-progress">0</div>
-        <div class="stat-label">今日已学</div>
-      </div>
     </div>
     <div id="phase-indicator"></div>
   </div>
@@ -223,9 +219,13 @@ h2{font-size:20px;margin-bottom:16px;font-weight:700}
 
   <div class="fc-done" id="fc-done" style="display:none">
     <div class="fc-done-icon">🎉</div>
-    <div class="fc-done-text">今日学习完成！</div>
+    <div class="fc-done-text" id="fc-done-text">今日学习完成！</div>
     <div style="color:var(--text2);font-size:14px;margin-bottom:16px" id="fc-summary"></div>
-    <button class="btn btn-outline btn-sm" onclick="goHome()">返回首页</button>
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:280px;margin:0 auto">
+      <button class="btn btn-primary btn-sm" onclick="continueStudy()">📖 继续学习新词</button>
+      <button class="btn btn-sm" onclick="reviewBookStudy()" id="fc-review-btn" style="background:rgba(255,107,107,.2);color:var(--err)">📕 复习本突击 (<span id="fc-rb-count">0</span>)</button>
+      <button class="btn btn-outline btn-sm" onclick="goHome()">🏠 返回首页</button>
+    </div>
   </div>
 </div>
 
@@ -4675,10 +4675,12 @@ function defaultState(){
   };
 }
 
-// 兼容旧数据：如果没有mastered/reviewBook字段则补上
+// 数据迁移：旧版本没有mastered/reviewBook，直接重置以保证数据一致性
 function migrateState(s){
-  if(!s.mastered)s.mastered={};
-  if(!s.reviewBook)s.reviewBook={};
+  if(!s.mastered||!s.reviewBook){
+    // 旧版数据，无法准确恢复mastered/reviewBook状态，重置全部
+    return defaultState();
+  }
   return s;
 }
 
@@ -4749,7 +4751,6 @@ function refreshHome(){
   document.getElementById('learned').textContent=learned;
   document.getElementById('total-words').textContent=V.length;
   document.getElementById('review-count').textContent=countReviewBook();
-  document.getElementById('today-progress').textContent=state.todayNew+state.todayRev;
   
   // Phase
   let phase=1;
@@ -5039,6 +5040,88 @@ function showDone(){
   document.getElementById('fc-done').style.display='';
   document.getElementById('fc-summary').textContent=
     `本次学习：${sessionNew}个新词 + ${sessionRev}个复习`;
+  // 更新复习本数量
+  const rbCount=countReviewBook();
+  document.getElementById('fc-rb-count').textContent=rbCount;
+  // 如果复习本为空则隐藏复习本突击按钮
+  document.getElementById('fc-review-btn').style.display=rbCount>0?'':'none';
+  // 检查是否还有新词可学
+  const {newCards}=getDueCards();
+  if(newCards.length===0){
+    document.getElementById('fc-done-text').textContent='全部新词已学完！';
+  }else{
+    document.getElementById('fc-done-text').textContent='本轮学习完成！';
+  }
+}
+
+// 继续学习：忽略每日限制，直接加载下一批新词
+function continueStudy(){
+  const {newCards,reviewCards}=getDueCards();
+  currentQueue=[];
+  
+  // 加载新词（不受dailyNew限制）
+  const newLimit=Math.min(newCards.length,state.settings.dailyNew);
+  for(let i=0;i<newLimit;i++)currentQueue.push({idx:newCards[i],isNew:true});
+  
+  // 也加一些复习
+  const revLimit=Math.min(reviewCards.length,10);
+  for(let i=0;i<revLimit;i++)currentQueue.push({idx:reviewCards[i],isNew:false});
+  
+  if(currentQueue.length===0){
+    document.getElementById('fc-done-text').textContent='暂无更多新词，明天再来！';
+    document.getElementById('fc-summary').textContent='所有可用的新词都已学过';
+    return;
+  }
+  
+  // Shuffle
+  for(let i=currentQueue.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [currentQueue[i],currentQueue[j]]=[currentQueue[j],currentQueue[i]];
+  }
+  
+  sessionNewTotal=0;sessionRevTotal=0;
+  currentQueue.forEach(function(item){if(item.isNew)sessionNewTotal++;else sessionRevTotal++;});
+  currentIdx=0;sessionNew=0;sessionRev=0;
+  
+  document.getElementById('fc-done').style.display='none';
+  showCard();
+  updateCardUI();
+}
+
+// 复习本突击：只加载复习本中的词
+function reviewBookStudy(){
+  currentQueue=[];
+  var rbIds=[];
+  for(var id in state.reviewBook){
+    if(state.reviewBook[id]){
+      var idx=parseInt(id.substring(1));
+      if(idx>=0&&idx<V.length)rbIds.push(idx);
+    }
+  }
+  
+  if(rbIds.length===0){
+    document.getElementById('fc-done-text').textContent='复习本为空！';
+    document.getElementById('fc-summary').textContent='没有需要复习的单词';
+    return;
+  }
+  
+  // 全部加入队列
+  for(var i=0;i<rbIds.length;i++){
+    currentQueue.push({idx:rbIds[i],isNew:false});
+  }
+  
+  // Shuffle
+  for(var i=currentQueue.length-1;i>0;i--){
+    var j=Math.floor(Math.random()*(i+1));
+    var tmp=currentQueue[i];currentQueue[i]=currentQueue[j];currentQueue[j]=tmp;
+  }
+  
+  sessionNewTotal=0;sessionRevTotal=currentQueue.length;
+  currentIdx=0;sessionNew=0;sessionRev=0;
+  
+  document.getElementById('fc-done').style.display='none';
+  showCard();
+  updateCardUI();
 }
 
 function updateCardUI(){
