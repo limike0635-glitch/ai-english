@@ -607,6 +607,11 @@ function showCard(){
   updateCardUI();
 }
 
+function getEnVoice(){
+  const voices=window.speechSynthesis.getVoices();
+  return voices.find(v=>v.lang.startsWith('en')&&v.name.includes('Google'))||voices.find(v=>v.lang.startsWith('en'))||null;
+}
+
 function speak(text){
   if(!text&&currentIdx<currentQueue.length){
     text=V[currentQueue[currentIdx].idx][0];
@@ -615,11 +620,27 @@ function speak(text){
   window.speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(text);
   u.lang='en-US';u.rate=0.85;u.pitch=1;
-  // 尝试选择英语语音
-  const voices=window.speechSynthesis.getVoices();
-  const enVoice=voices.find(v=>v.lang.startsWith('en')&&v.name.includes('Google'))||voices.find(v=>v.lang.startsWith('en'));
-  if(enVoice)u.voice=enVoice;
+  const ev=getEnVoice();if(ev)u.voice=ev;
   window.speechSynthesis.speak(u);
+}
+
+// 朗读单词，结束后自动接着朗读例句
+function speakWordThenExample(){
+  if(currentIdx>=currentQueue.length)return;
+  const v=V[currentQueue[currentIdx].idx];
+  window.speechSynthesis.cancel();
+  // 第一段：单词
+  const u1=new SpeechSynthesisUtterance(v[0]);
+  u1.lang='en-US';u1.rate=0.85;u1.pitch=1;
+  const ev=getEnVoice();if(ev)u1.voice=ev;
+  // 第二段：例句（单词读完后自动衔接）
+  u1.onend=function(){
+    const u2=new SpeechSynthesisUtterance(v[2]);
+    u2.lang='en-US';u2.rate=0.78;u2.pitch=1;
+    const ev2=getEnVoice();if(ev2)u2.voice=ev2;
+    window.speechSynthesis.speak(u2);
+  };
+  window.speechSynthesis.speak(u1);
 }
 
 // 预加载语音列表
@@ -630,10 +651,16 @@ if(window.speechSynthesis){
 
 function flipCard(){
   const card=document.getElementById('fc-card');
-  if(!card.classList.contains('flipped')){
+  if(card.classList.contains('flipped')){
+    // 翻回正面：也朗读单词+例句
+    card.classList.remove('flipped');
+    document.getElementById('fc-btns').style.display='none';
+    speakWordThenExample();
+  }else{
+    // 翻到背面：显示按钮，朗读单词+例句
     card.classList.add('flipped');
     document.getElementById('fc-btns').style.display='flex';
-    speak();// 翻转时自动朗读
+    speakWordThenExample();
   }
 }
 
