@@ -39,6 +39,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .fc-front{background:linear-gradient(145deg,#1e1e3a,#16213e);border:1px solid #2a2a4a}
 .fc-back{background:linear-gradient(145deg,#1a2a3e,#162e3e);border:1px solid #1a4a4a;transform:rotateY(180deg)}
 .fc-word{font-size:32px;font-weight:700;color:#fff;margin-bottom:8px;text-align:center}
+.fc-speak{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:rgba(78,205,196,.15);border:none;font-size:22px;cursor:pointer;margin-top:8px;transition:.2s}
+.fc-speak:active{transform:scale(.9);background:rgba(78,205,196,.3)}
 .fc-hint{font-size:13px;color:var(--text3);margin-top:8px}
 .fc-cn{font-size:24px;font-weight:600;color:var(--accent);margin-bottom:12px;text-align:center}
 .fc-ex{font-size:14px;color:var(--text2);line-height:1.6;text-align:center;margin-bottom:4px}
@@ -169,10 +171,12 @@ h2{font-size:20px;margin-bottom:16px;font-weight:700}
       <div class="fc-face fc-front">
         <div class="fc-phase" id="fc-phase-tag"></div>
         <div class="fc-word" id="fc-word"></div>
-        <div class="fc-hint">👆 点击翻转查看释义</div>
+        <button class="fc-speak" onclick="event.stopPropagation();speak()" title="朗读">🔊</button>
+        <div class="fc-hint">👆 点击翻转查看释义 · 点🔊听发音</div>
       </div>
       <div class="fc-face fc-back">
         <div class="fc-cn" id="fc-cn"></div>
+        <button class="fc-speak" onclick="event.stopPropagation();speak()" title="再听一次">🔊</button>
         <div class="fc-ex" id="fc-ex"></div>
         <div class="fc-excn" id="fc-excn"></div>
       </div>
@@ -603,11 +607,33 @@ function showCard(){
   updateCardUI();
 }
 
+function speak(text){
+  if(!text&&currentIdx<currentQueue.length){
+    text=V[currentQueue[currentIdx].idx][0];
+  }
+  if(!text)return;
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='en-US';u.rate=0.85;u.pitch=1;
+  // 尝试选择英语语音
+  const voices=window.speechSynthesis.getVoices();
+  const enVoice=voices.find(v=>v.lang.startsWith('en')&&v.name.includes('Google'))||voices.find(v=>v.lang.startsWith('en'));
+  if(enVoice)u.voice=enVoice;
+  window.speechSynthesis.speak(u);
+}
+
+// 预加载语音列表
+if(window.speechSynthesis){
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged=function(){window.speechSynthesis.getVoices();};
+}
+
 function flipCard(){
   const card=document.getElementById('fc-card');
   if(!card.classList.contains('flipped')){
     card.classList.add('flipped');
     document.getElementById('fc-btns').style.display='flex';
+    speak();// 翻转时自动朗读
   }
 }
 
