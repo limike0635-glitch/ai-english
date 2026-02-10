@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>AI英语学习助手</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f0f23;--card:#1a1a2e;--card2:#16213e;--accent:#4ecdc4;--accent2:#45b7aa;--err:#ff6b6b;--warn:#ffe66d;--text:#e8e8e8;--text2:#a0a0b0;--text3:#6a6a7a;--radius:12px}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:70px;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+.page{display:none;padding:16px;padding-bottom:80px;animation:fadeIn .3s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes flipIn{from{transform:rotateY(90deg)}to{transform:rotateY(0)}}
+/* Nav */
+.nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);display:flex;justify-content:space-around;padding:8px 0 env(safe-area-inset-bottom,8px);border-top:1px solid #2a2a4a;z-index:100}
+.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 12px;cursor:pointer;border-radius:8px;transition:.2s;font-size:11px;color:var(--text3);min-width:56px}
+.nav-item.active{color:var(--accent)}
+.nav-item .icon{font-size:22px;margin-bottom:2px}
+/* Cards */
+.stat-card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.stat-row{display:flex;gap:10px;margin-bottom:12px}
+.stat-box{flex:1;background:var(--card2);border-radius:10px;padding:14px;text-align:center}
+.stat-num{font-size:28px;font-weight:700;color:var(--accent);line-height:1.2}
+.stat-label{font-size:12px;color:var(--text2);margin-top:4px}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 24px;border:none;border-radius:var(--radius);font-size:16px;font-weight:600;cursor:pointer;transition:.2s;width:100%;color:#fff}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2))}
+.btn-primary:active{transform:scale(.97)}
+.btn-danger{background:var(--err)}
+.btn-sm{padding:10px 16px;font-size:14px;width:auto}
+.btn-outline{background:transparent;border:1px solid var(--text3);color:var(--text2)}
+/* Flashcard */
+.fc-container{perspective:1000px;margin:20px 0}
+.fc-card{position:relative;min-height:260px;cursor:pointer;transition:transform .5s;transform-style:preserve-3d}
+.fc-card.flipped{transform:rotateY(180deg)}
+.fc-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:var(--radius);padding:24px;display:flex;flex-direction:column;justify-content:center;align-items:center}
+.fc-front{background:linear-gradient(145deg,#1e1e3a,#16213e);border:1px solid #2a2a4a}
+.fc-back{background:linear-gradient(145deg,#1a2a3e,#162e3e);border:1px solid #1a4a4a;transform:rotateY(180deg)}
+.fc-word{font-size:32px;font-weight:700;color:#fff;margin-bottom:8px;text-align:center}
+.fc-hint{font-size:13px;color:var(--text3);margin-top:8px}
+.fc-cn{font-size:24px;font-weight:600;color:var(--accent);margin-bottom:12px;text-align:center}
+.fc-ex{font-size:14px;color:var(--text2);line-height:1.6;text-align:center;margin-bottom:4px}
+.fc-excn{font-size:13px;color:var(--text3);text-align:center}
+.fc-phase{position:absolute;top:12px;right:12px;font-size:11px;padding:3px 8px;border-radius:20px;background:rgba(78,205,196,.15);color:var(--accent)}
+.fc-btns{display:flex;gap:10px;margin-top:16px}
+.fc-btn{flex:1;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:.2s}
+.fc-btn:active{transform:scale(.95)}
+.fc-btn.wrong{background:#3a1a1a;color:var(--err)}
+.fc-btn.fuzzy{background:#3a3a1a;color:var(--warn)}
+.fc-btn.right{background:#1a3a2a;color:#4ecdc4}
+.fc-progress{height:4px;background:#2a2a4a;border-radius:2px;margin:12px 0;overflow:hidden}
+.fc-progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width .3s}
+.fc-stats{display:flex;justify-content:space-between;font-size:12px;color:var(--text3)}
+.fc-done{text-align:center;padding:40px 20px}
+.fc-done-icon{font-size:48px;margin-bottom:16px}
+.fc-done-text{font-size:18px;color:var(--text);margin-bottom:8px}
+/* Grammar */
+.grammar-item{background:var(--card);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
+.grammar-header{padding:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:15px}
+.grammar-header .arrow{transition:transform .3s;color:var(--text3)}
+.grammar-item.open .arrow{transform:rotate(180deg)}
+.grammar-body{max-height:0;overflow:hidden;transition:max-height .4s ease}
+.grammar-item.open .grammar-body{max-height:800px}
+.grammar-desc{padding:0 16px 12px;font-size:14px;color:var(--text2);line-height:1.7}
+.grammar-ex{padding:8px 16px;background:var(--card2);margin:0 12px 8px;border-radius:8px;border-left:3px solid var(--accent)}
+.grammar-ex .en{font-size:14px;color:#fff;margin-bottom:4px}
+.grammar-ex .cn{font-size:13px;color:var(--text3);margin-bottom:4px}
+.grammar-ex .note{font-size:12px;color:var(--accent);opacity:.7}
+.grammar-ex:last-child{margin-bottom:16px}
+/* Plan */
+.timeline{position:relative;padding-left:24px}
+.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:#2a2a4a}
+.phase-block{margin-bottom:20px;position:relative}
+.phase-dot{position:absolute;left:-20px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--text3);border:2px solid var(--bg)}
+.phase-dot.active{background:var(--accent)}
+.phase-dot.done{background:#4ecdc4}
+.phase-title{font-size:16px;font-weight:600;margin-bottom:8px}
+.milestone{display:flex;align-items:center;padding:8px 0;font-size:14px;color:var(--text2);cursor:pointer}
+.milestone input{margin-right:10px;width:18px;height:18px;accent-color:var(--accent)}
+/* Settings */
+.setting-group{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.setting-label{font-size:14px;color:var(--text2);margin-bottom:8px;display:flex;justify-content:space-between}
+.setting-label span{color:var(--accent);font-weight:600}
+input[type=range]{width:100%;height:6px;appearance:none;background:#2a2a4a;border-radius:3px;outline:none;margin:8px 0}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:22px;height:22px;border-radius:50%;background:var(--accent);cursor:pointer}
+.tool-card{background:var(--card2);border-radius:10px;padding:14px;margin-bottom:10px}
+.tool-name{font-size:15px;font-weight:600;color:var(--accent);margin-bottom:4px}
+.tool-desc{font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:6px}
+.tool-tip{font-size:12px;color:var(--text3);padding:8px;background:rgba(78,205,196,.05);border-radius:6px;border-left:2px solid var(--accent)}
+.tool-url{font-size:12px;color:var(--accent);text-decoration:none;display:inline-block;margin-top:4px}
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;justify-content:center;align-items:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border-radius:16px;padding:24px;margin:20px;max-width:340px;width:100%;text-align:center}
+.modal h3{margin-bottom:12px;font-size:18px}
+.modal p{color:var(--text2);font-size:14px;margin-bottom:20px;line-height:1.5}
+.modal-btns{display:flex;gap:10px}
+.modal-btns .btn{flex:1}
+/* Misc */
+h2{font-size:20px;margin-bottom:16px;font-weight:700}
+.section-title{font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px}
+.empty-state{text-align:center;padding:40px;color:var(--text3)}
+.phase-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:12px}
+.phase-1{background:rgba(78,205,196,.15);color:#4ecdc4}
+.phase-2{background:rgba(255,230,109,.15);color:#ffe66d}
+.phase-3{background:rgba(255,107,107,.15);color:#ff6b6b}
+.greeting{font-size:24px;font-weight:700;margin-bottom:4px}
+.subtext{font-size:14px;color:var(--text2);margin-bottom:16px}
+.streak-fire{font-size:36px;display:block;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<!-- ===== PAGES ===== -->
+
+<!-- HOME -->
+<div id="pg-home" class="page active">
+  <div class="greeting" id="greeting">AI英语学习助手</div>
+  <div class="subtext">每天15分钟，6个月读懂AI英文</div>
+  
+  <div class="stat-card">
+    <div class="stat-row">
+      <div class="stat-box">
+        <div class="streak-fire">🔥</div>
+        <div class="stat-num" id="streak">0</div>
+        <div class="stat-label">连续天数</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="learned">0</div>
+        <div class="stat-label">已学单词</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="total-words">131</div>
+        <div class="stat-label">总词汇量</div>
+      </div>
+    </div>
+    <div id="phase-indicator"></div>
+  </div>
+
+  <div class="stat-card">
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px">📋 今日任务</div>
+    <div id="today-tasks" style="font-size:14px;color:var(--text2);line-height:1.8"></div>
+  </div>
+
+  <button class="btn btn-primary" onclick="startStudy()" style="margin-top:8px">
+    ▶️ 开始今日学习
+  </button>
+
+  <div class="stat-card" style="margin-top:12px">
+    <div style="font-size:13px;color:var(--text3);line-height:1.6">
+      💡 <strong>辅助工具</strong>：遇到不理解的语法或句子，打开 <a href="https://chat.deepseek.com" target="_blank" style="color:var(--accent)">DeepSeek</a>（完全免费），把句子粘贴过去让它帮你分析。
+    </div>
+  </div>
+</div>
+
+<!-- CARDS -->
+<div id="pg-cards" class="page">
+  <h2>📇 单词卡片</h2>
+  <div class="fc-stats">
+    <span id="fc-count">0 / 0</span>
+    <span id="fc-new-count">新词: 0</span>
+  </div>
+  <div class="fc-progress"><div class="fc-progress-bar" id="fc-bar" style="width:0%"></div></div>
+  
+  <div class="fc-container" id="fc-area">
+    <div class="fc-card" id="fc-card" onclick="flipCard()">
+      <div class="fc-face fc-front">
+        <div class="fc-phase" id="fc-phase-tag"></div>
+        <div class="fc-word" id="fc-word"></div>
+        <div class="fc-hint">👆 点击翻转查看释义</div>
+      </div>
+      <div class="fc-face fc-back">
+        <div class="fc-cn" id="fc-cn"></div>
+        <div class="fc-ex" id="fc-ex"></div>
+        <div class="fc-excn" id="fc-excn"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fc-btns" id="fc-btns" style="display:none">
+    <button class="fc-btn wrong" onclick="answer(0)">❌ 不认识</button>
+    <button class="fc-btn fuzzy" onclick="answer(1)">🤔 模糊</button>
+    <button class="fc-btn right" onclick="answer(2)">✅ 认识</button>
+  </div>
+
+  <div class="fc-done" id="fc-done" style="display:none">
+    <div class="fc-done-icon">🎉</div>
+    <div class="fc-done-text">今日学习完成！</div>
+    <div style="color:var(--text2);font-size:14px;margin-bottom:16px" id="fc-summary"></div>
+    <button class="btn btn-outline btn-sm" onclick="goHome()">返回首页</button>
+  </div>
+</div>
+
+<!-- GRAMMAR -->
+<div id="pg-grammar" class="page">
+  <h2>📝 语法骨架</h2>
+  <div class="subtext">掌握这5个句式，读懂80%的技术文章</div>
+  <div id="grammar-list"></div>
+</div>
+
+<!-- PLAN -->
+<div id="pg-plan" class="page">
+  <h2>📅 学习计划</h2>
+  <div class="subtext">6个月 · 3个阶段 · 从零到独立阅读</div>
+  <div id="plan-content"></div>
+</div>
+
+<!-- SETTINGS -->
+<div id="pg-settings" class="page">
+  <h2>⚙️ 设置</h2>
+  
+  <div class="setting-group">
+    <div class="setting-label">每日新词数量 <span id="new-val">10</span></div>
+    <input type="range" min="5" max="20" value="10" id="new-slider" oninput="updateSetting('new',this.value)">
+    <div class="setting-label" style="margin-top:12px">每日复习上限 <span id="rev-val">50</span></div>
+    <input type="range" min="20" max="100" value="50" id="rev-slider" oninput="updateSetting('rev',this.value)">
+  </div>
+
+  <div class="setting-group">
+    <div style="font-size:15px;font-weight:600;margin-bottom:12px">📦 数据管理</div>
+    <button class="btn btn-outline btn-sm" onclick="exportData()" style="margin-bottom:8px">📤 导出学习数据</button>
+    <button class="btn btn-outline btn-sm" onclick="document.getElementById('import-file').click()" style="margin-bottom:8px">📥 导入学习数据</button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+    <button class="btn btn-danger btn-sm" onclick="showModal()">🗑️ 重置所有进度</button>
+  </div>
+
+  <div class="section-title">🛠️ 推荐辅助工具</div>
+  <div id="tools-list"></div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nav-item active" onclick="go('home')"><span class="icon">🏠</span>首页</div>
+  <div class="nav-item" onclick="go('cards')"><span class="icon">📇</span>单词</div>
+  <div class="nav-item" onclick="go('grammar')"><span class="icon">📝</span>语法</div>
+  <div class="nav-item" onclick="go('plan')"><span class="icon">📅</span>计划</div>
+  <div class="nav-item" onclick="go('settings')"><span class="icon">⚙️</span>设置</div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3>确认重置</h3>
+    <p>这将清除所有学习进度、单词记录和连续天数。此操作不可撤销！</p>
+    <div class="modal-btns">
+      <button class="btn btn-outline btn-sm" onclick="hideModal()">取消</button>
+      <button class="btn btn-danger btn-sm" onclick="resetAll()">确认重置</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== VOCABULARY DATA =====
+const V=[
+["is","是","The model is ready.","模型准备好了。",1],
+["are","是(复数)","The results are good.","结果很好。",1],
+["was","是(过去)","It was trained yesterday.","它昨天被训练了。",1],
+["have","有","We have enough data.","我们有足够的数据。",1],
+["can","能","This model can generate text.","这个模型能生成文本。",1],
+["will","将","We will train a new model.","我们将训练新模型。",1],
+["should","应该","You should use more data.","你应该用更多数据。",1],
+["need","需要","We need more training data.","我们需要更多训练数据。",1],
+["must","必须","You must preprocess the data.","你必须预处理数据。",1],
+["want","想要","I want to fine-tune this model.","我想微调这个模型。",1],
+["and","和","Training and testing are important.","训练和测试都很重要。",1],
+["or","或","Use GPU or TPU for training.","用GPU或TPU训练。",1],
+["but","但是","The model is fast but not accurate.","模型快但不准确。",1],
+["if","如果","If the loss decreases, it's learning.","如果损失下降就在学习。",1],
+["because","因为","It failed because of bad data.","因为数据差所以失败。",1],
+["so","所以","Data is clean, so results are good.","数据干净所以结果好。",1],
+["however","然而","However, the model is too slow.","然而模型太慢了。",1],
+["also","也","This also works for images.","这也适用于图像。",1],
+["then","然后","First load data, then train.","先加载数据然后训练。",1],
+["when","当…时","When training is done, save it.","训练完成后保存它。",1],
+["in","在…里","In this paper, we propose a method.","在本文中我们提出方法。",1],
+["on","在…上","The model runs on GPU.","模型在GPU上运行。",1],
+["to","到","Send data to the server.","把数据发到服务器。",1],
+["from","从","Download the model from website.","从网站下载模型。",1],
+["with","用","Train the model with more data.","用更多数据训练模型。",1],
+["by","通过","Accuracy improved by fine-tuning.","准确率通过微调提升。",1],
+["for","为了","This tool is for data analysis.","这工具用于数据分析。",1],
+["of","的","The accuracy of the model is 95%.","模型准确率95%。",1],
+["about","关于","This article is about deep learning.","本文关于深度学习。",1],
+["at","在","Training stops at 100 epochs.","训练在100轮时停止。",1],
+["this","这个","This method is very effective.","方法非常有效。",1],
+["that","那个","That approach was proposed in 2023.","那方法2023年提出。",1],
+["it","它","It performs better than GPT-3.","它比GPT-3好。",1],
+["they","它们","They released a new version.","他们发布了新版本。",1],
+["we","我们","We trained the model for 3 days.","我们训练了3天。",1],
+["all","所有","All experiments are done.","所有实验完成了。",1],
+["new","新的","A new model was released.","新模型发布了。",1],
+["large","大的","We use a large dataset.","我们用大数据集。",1],
+["small","小的","A small model runs faster.","小模型跑得更快。",1],
+["high","高的","The accuracy is high.","准确率很高。",1],
+["low","低的","The loss is very low.","损失非常低。",1],
+["more","更多","We need more compute.","需要更多算力。",1],
+["very","非常","The model is very fast.","模型非常快。",1],
+["first","首先","First, prepare the dataset.","首先准备数据集。",1],
+["next","下一","The next step is training.","下一步是训练。",1],
+["already","已经","The model is already trained.","模型已经训练好了。",1],
+["model","模型","This model can understand text.","模型能理解文本。",1],
+["data","数据","We collected a lot of data.","我们收集了大量数据。",1],
+["training","训练","Training takes a long time.","训练耗时很长。",1],
+["network","网络","A neural network has many layers.","神经网络有很多层。",1],
+["algorithm","算法","This algorithm is very efficient.","算法非常高效。",1],
+["parameter","参数","The model has millions of parameters.","模型有数百万参数。",1],
+["accuracy","准确率","Accuracy reached 98%.","准确率达到98%。",1],
+["result","结果","The results are very promising.","结果令人期待。",1],
+["method","方法","We propose a new method.","我们提出新方法。",1],
+["task","任务","This is a classification task.","这是分类任务。",1],
+["error","误差","The error rate is 2%.","误差率是2%。",1],
+["feature","特征","Extract features from data.","从数据提取特征。",1],
+["dataset","数据集","The dataset has 1M images.","数据集有100万图。",1],
+["input","输入","The input is a text string.","输入是文本字符串。",1],
+["output","输出","The output is a prediction.","输出是预测结果。",1],
+["function","函数","This function processes data.","函数处理数据。",1],
+["performance","性能","Performance improved a lot.","性能提升很多。",1],
+["system","系统","This is an AI-powered system.","这是AI系统。",1],
+["label","标签","Each sample has a label.","每样本有标签。",1],
+["value","值","The loss value is decreasing.","损失值在下降。",1],
+["neural network","神经网络","A neural network learns from data.","神经网络从数据学习。",1],
+["deep learning","深度学习","Deep learning needs large datasets.","深度学习需要大数据集。",1],
+["machine learning","机器学习","Machine learning is a branch of AI.","机器学习是AI的分支。",1],
+["transformer","Transformer","GPT is based on the transformer.","GPT基于Transformer。",1],
+["attention","注意力机制","Attention helps the model focus.","注意力帮助模型聚焦。",1],
+["token","词元","Each word is split into tokens.","词被拆分成词元。",1],
+["embedding","嵌入向量","Word embeddings capture meaning.","词嵌入捕捉语义。",1],
+["prompt","提示词","Write a good prompt for the AI.","为AI写好提示词。",1],
+["fine-tuning","微调","Fine-tuning improves performance.","微调提升性能。",1],
+["pre-training","预训练","Pre-training uses large text data.","预训练用大量文本。",1],
+["inference","推理","Inference is faster than training.","推理比训练快。",1],
+["overfitting","过拟合","Overfitting means memorizing data.","过拟合指记住数据。",1],
+["loss function","损失函数","The loss function measures error.","损失函数衡量误差。",1],
+["optimization","优化","Optimization finds best parameters.","优化找最佳参数。",1],
+["weight","权重","Each connection has a weight.","每个连接有权重。",1],
+["layer","层","This network has 12 layers.","网络有12层。",1],
+["epoch","轮次","Train for 100 epochs.","训练100个轮次。",1],
+["batch","批次","Each batch has 32 samples.","每批有32个样本。",1],
+["hallucination","幻觉","AI sometimes produces hallucinations.","AI有时产生幻觉。",1],
+["RAG","检索增强生成","RAG reduces hallucination.","RAG减少幻觉。",1],
+["zero-shot","零样本","Zero-shot means no examples given.","零样本即不给示例。",1],
+["few-shot","少样本","Few-shot learning uses 2-5 examples.","少样本用2-5个例子。",1],
+["agent","智能体","AI agents can use tools.","AI智能体能用工具。",1],
+["benchmark","基准测试","We tested on standard benchmarks.","在标准基准上测试。",1],
+["API","应用接口","Call the API to get results.","调用API获取结果。",1],
+["deploy","部署","Deploy the model to production.","部署模型到生产。",1],
+["GPU","显卡","Training requires a powerful GPU.","训练需强大显卡。",1],
+["open source","开源","This model is open source.","模型是开源的。",1],
+["scalable","可扩展","The system is highly scalable.","系统高度可扩展。",1],
+["state-of-the-art","最先进","This is state-of-the-art result.","这是最先进的结果。",1],
+["multimodal","多模态","GPT-4 is a multimodal model.","GPT-4是多模态模型。",1],
+["train","训练(动词)","We train the model on data.","在数据上训练模型。",1],
+["evaluate","评估","Evaluate on test data.","在测试集上评估。",1],
+["generate","生成","The model can generate text.","模型能生成文本。",1],
+["predict","预测","The model predicts next word.","模型预测下一词。",1],
+["improve","改进","We improved accuracy by 5%.","准确率提升了5%。",1],
+["implement","实现","Implement this in Python.","用Python实现。",1],
+["configure","配置","Configure the hyperparameters.","配置超参数。",1],
+["run","运行","Run the script to start.","运行脚本开始。",1],
+["download","下载","Download the model weights.","下载模型权重。",1],
+["import","导入","Import the library first.","先导入这个库。",1],
+["based on","基于","This method is based on transformers.","方法基于Transformer。",2],
+["compared to","与…相比","Compared to GPT-3, GPT-4 is better.","与GPT-3比GPT-4更好。",2],
+["due to","由于","Due to limited data, accuracy is low.","由于数据少准确率低。",2],
+["results in","导致","More data results in better performance.","更多数据带来更好性能。",2],
+["leads to","导致","Overfitting leads to poor results.","过拟合导致差结果。",2],
+["depends on","取决于","Performance depends on data quality.","性能取决于数据质量。",2],
+["consists of","由…组成","The model consists of 12 layers.","模型由12层组成。",2],
+["is designed to","旨在","This tool is designed to help.","这工具旨在帮助人。",2],
+["is used for","用于","GPT is used for text generation.","GPT用于文本生成。",2],
+["is known as","被称为","This is known as transfer learning.","这被称为迁移学习。",2],
+["as a result","因此","As a result, it performs better.","因此它表现更好。",2],
+["in addition","此外","In addition, we tested on more data.","此外我们测试了更多。",2],
+["furthermore","而且","Furthermore, the method is faster.","而且方法更快。",2],
+["in terms of","在…方面","In terms of speed, model A wins.","速度方面模型A胜出。",2],
+["rather than","而不是","Fine-tune rather than retrain.","微调而非重新训练。",2],
+["instead of","代替","Use Python instead of Java.","用Python代替Java。",2],
+["we propose","我们提出","We propose a new architecture.","我们提出新架构。",2],
+["we demonstrate","我们证明","We demonstrate it works.","我们证明它有效。",2],
+["according to","根据","According to the results.","根据结果。",2],
+["in contrast","相反","In contrast, ours is simpler.","相反我们的更简单。",2]
+];
+
+// ===== GRAMMAR DATA =====
+const GRAMMAR=[
+{t:"主谓宾结构 (SVO)",d:"英语最基本的句子结构是「主语 + 动词 + 宾语」。技术文章中的简单陈述句都用这个结构。掌握这个结构是阅读的基础。",ex:[
+["The model processes the data.","模型处理数据。","model=主语, processes=动词, data=宾语"],
+["This algorithm solves the problem.","这个算法解决问题。","algorithm=主, solves=动, problem=宾"],
+["We trained a new model.","我们训练了新模型。","We=主, trained=动, model=宾"],
+["The team released an update.","团队发布了更新。","team=主, released=动, update=宾"]]},
+{t:"被动语态 (Passive Voice)",d:"技术文章中超过40%的句子用被动语态！结构是：主语 + is/are/was/were + 过去分词。当我们更关心「发生了什么」而不是「谁做的」时，就用被动语态。",ex:[
+["The model is trained on large data.","模型在大数据上被训练。","is trained = 被动语态"],
+["Results were shown in Table 1.","结果在表1中展示。","were shown = 被动语态"],
+["The method was proposed in 2023.","该方法在2023年被提出。","was proposed = 被动语态"],
+["Features are extracted automatically.","特征被自动提取。","are extracted = 被动语态"]]},
+{t:"条件句 (If-conditionals)",d:"用 if 引导一个条件，后面跟结果。技术文章中常用于描述因果关系和使用建议。结构：If + 条件, 结果。",ex:[
+["If the loss decreases, the model is learning.","如果损失下降，模型在学习。","if + 条件 → 结果"],
+["If you use more data, accuracy will improve.","用更多数据准确率会提高。","if + 条件 → will + 结果"],
+["If the model overfits, try dropout.","如果过拟合，试试dropout。","if + 条件 → 建议"]]},
+{t:"动名词作主语 (-ing as subject)",d:"动词的 -ing 形式放在句首做主语，在技术文章中非常常见。比如 Training... / Fine-tuning... / Using... 开头的句子。",ex:[
+["Training large models requires GPUs.","训练大模型需要GPU。","Training = 动名词做主语"],
+["Fine-tuning improves task performance.","微调提升任务性能。","Fine-tuning = 动名词做主语"],
+["Using attention helps the model focus.","使用注意力帮助模型聚焦。","Using = 动名词做主语"]]},
+{t:"定语从句 (that/which)",d:"用 that 或 which 引导的从句来修饰前面的名词。that 用于限制性从句（不可省略），which 用于非限制性从句（前面有逗号，补充说明）。",ex:[
+["Models that use attention perform better.","使用注意力的模型表现更好。","that use attention 修饰 Models"],
+["The dataset, which has 1M samples, is large.","数据集有100万样本，很大。","which... 补充说明 dataset"],
+["Methods that reduce overfitting are important.","减少过拟合的方法很重要。","that reduce... 修饰 Methods"]]}
+];
+
+// ===== TOOLS DATA =====
+const TOOLS=[
+{n:"DeepSeek (深度求索)",d:"完全免费的AI助手，替代ChatGPT。支持中英双语，可以帮你解释英语语法、分析句子结构、学习词汇。无需VPN，国内直接访问。",url:"https://chat.deepseek.com",tip:"提示词模板：「请用中文帮我分析这个英语句子的语法结构：[粘贴句子]」"},
+{n:"AnkiDroid (Android免费)",d:"专业的间隔重复背词工具，比本网页的闪卡功能更强大。适合想要进阶的同学。在Google Play或应用市场搜索安装。",url:"https://github.com/ankidroid/Anki-Android/releases",tip:"搜索共享卡组 → 输入 Machine Learning Vocabulary"},
+{n:"沉浸式翻译",d:"浏览器扩展，实现网页双语对照阅读。Android可在 Kiwi浏览器 或 Firefox 中安装使用。看英文网页时自动显示中英对照。",url:"https://immersivetranslate.com",tip:"安装后打开任何英文网页 → 点击扩展图标 → 一键双语对照"}
+];
+
+// ===== APP STATE =====
+const STORE_KEY='ael-data';
+let state=loadState();
+
+function defaultState(){
+  return{
+    streak:0,lastDate:null,
+    cards:{},// {id:{iv:1,rep:0,last:null,ease:2.5}}
+    settings:{dailyNew:10,dailyReview:50},
+    milestones:{},
+    todayNew:0,todayRev:0,todayDate:null
+  };
+}
+
+function loadState(){
+  try{const s=localStorage.getItem(STORE_KEY);return s?JSON.parse(s):defaultState();}
+  catch(e){return defaultState();}
+}
+
+function saveState(){localStorage.setItem(STORE_KEY,JSON.stringify(state));}
+
+// ===== NAVIGATION =====
+function go(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('pg-'+page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach((n,i)=>{
+    n.classList.toggle('active',['home','cards','grammar','plan','settings'][i]===page);
+  });
+  if(page==='home')refreshHome();
+  if(page==='cards')initCards();
+  if(page==='grammar')renderGrammar();
+  if(page==='plan')renderPlan();
+  if(page==='settings')renderSettings();
+}
+
+function goHome(){go('home');}
+function startStudy(){go('cards');}
+
+// ===== DATE UTILS =====
+function today(){return new Date().toISOString().slice(0,10);}
+function daysBetween(a,b){
+  if(!a||!b)return 999;
+  return Math.floor((new Date(b)-new Date(a))/(86400000));
+}
+
+// ===== STREAK =====
+function updateStreak(){
+  const t=today();
+  if(state.lastDate===t)return;
+  const d=daysBetween(state.lastDate,t);
+  if(d===1)state.streak++;
+  else if(d>1)state.streak=1;
+  else if(!state.lastDate)state.streak=1;
+  state.lastDate=t;
+  saveState();
+}
+
+// ===== HOME =====
+function refreshHome(){
+  const t=today();
+  // Reset daily counters if new day
+  if(state.todayDate!==t){
+    state.todayNew=0;state.todayRev=0;state.todayDate=t;
+    saveState();
+  }
+  
+  document.getElementById('streak').textContent=state.streak;
+  
+  // Count learned words
+  let learned=0;
+  for(let id in state.cards){
+    if(state.cards[id].iv>=4)learned++;
+  }
+  document.getElementById('learned').textContent=learned;
+  document.getElementById('total-words').textContent=V.length;
+  
+  // Phase
+  let phase=1;
+  if(learned>=100)phase=2;
+  if(learned>=V.length-20)phase=3;
+  const phaseEl=document.getElementById('phase-indicator');
+  phaseEl.innerHTML=`<span class="phase-badge phase-${phase}">第${phase}阶段 · ${['基础词汇','短语搭配','独立阅读'][phase-1]}</span>`;
+  
+  // Today tasks
+  const {newCards,reviewCards}=getDueCards();
+  const tasksEl=document.getElementById('today-tasks');
+  const newLeft=Math.min(newCards.length,state.settings.dailyNew-state.todayNew);
+  const revLeft=Math.min(reviewCards.length,state.settings.dailyReview-state.todayRev);
+  if(newLeft<=0&&revLeft<=0){
+    tasksEl.innerHTML='✅ 今日任务已完成！明天继续加油 💪';
+  }else{
+    tasksEl.innerHTML=`
+      📖 新词学习：${Math.max(0,newLeft)} 个<br>
+      🔄 复习巩固：${Math.max(0,revLeft)} 个<br>
+      ⏱️ 预计用时：${Math.ceil((Math.max(0,newLeft)+Math.max(0,revLeft))*0.3)} 分钟
+    `;
+  }
+  
+  // Greeting
+  const h=new Date().getHours();
+  const greetings=['🌙 夜深了，注意休息','☀️ 早上好！新的一天','🌤️ 上午好','🍜 中午好','☀️ 下午好','🌆 傍晚好','🌙 晚上好'];
+  const gi=h<6?0:h<9?1:h<12?2:h<13?3:h<17?4:h<19?5:6;
+  document.getElementById('greeting').textContent=greetings[gi];
+}
+
+// ===== FLASHCARD SYSTEM =====
+let currentQueue=[];
+let currentIdx=0;
+let sessionNew=0;
+let sessionRev=0;
+
+function getDueCards(){
+  const t=today();
+  const newCards=[];
+  const reviewCards=[];
+  
+  V.forEach((v,i)=>{
+    const id='w'+i;
+    const c=state.cards[id];
+    if(!c){
+      newCards.push(i);
+    }else{
+      const daysSince=daysBetween(c.last,t);
+      if(daysSince>=c.iv){
+        reviewCards.push(i);
+      }
+    }
+  });
+  
+  return{newCards,reviewCards};
+}
+
+function initCards(){
+  const t=today();
+  if(state.todayDate!==t){
+    state.todayNew=0;state.todayRev=0;state.todayDate=t;
+    saveState();
+  }
+  
+  const{newCards,reviewCards}=getDueCards();
+  currentQueue=[];
+  
+  // Add review cards first
+  const revLimit=Math.min(reviewCards.length,state.settings.dailyReview-state.todayRev);
+  for(let i=0;i<revLimit;i++)currentQueue.push({idx:reviewCards[i],isNew:false});
+  
+  // Then new cards
+  const newLimit=Math.min(newCards.length,state.settings.dailyNew-state.todayNew);
+  for(let i=0;i<newLimit;i++)currentQueue.push({idx:newCards[i],isNew:true});
+  
+  // Shuffle
+  for(let i=currentQueue.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [currentQueue[i],currentQueue[j]]=[currentQueue[j],currentQueue[i]];
+  }
+  
+  currentIdx=0;sessionNew=0;sessionRev=0;
+  
+  if(currentQueue.length===0){
+    showDone();
+  }else{
+    showCard();
+  }
+  
+  updateCardUI();
+}
+
+function showCard(){
+  if(currentIdx>=currentQueue.length){showDone();return;}
+  
+  const item=currentQueue[currentIdx];
+  const v=V[item.idx];
+  
+  document.getElementById('fc-card').classList.remove('flipped');
+  document.getElementById('fc-word').textContent=v[0];
+  document.getElementById('fc-cn').textContent=v[1];
+  document.getElementById('fc-ex').textContent=v[2];
+  document.getElementById('fc-excn').textContent=v[3];
+  document.getElementById('fc-phase-tag').textContent='阶段'+v[4];
+  
+  document.getElementById('fc-area').style.display='';
+  document.getElementById('fc-btns').style.display='none';
+  document.getElementById('fc-done').style.display='none';
+  
+  updateCardUI();
+}
+
+function flipCard(){
+  const card=document.getElementById('fc-card');
+  if(!card.classList.contains('flipped')){
+    card.classList.add('flipped');
+    document.getElementById('fc-btns').style.display='flex';
+  }
+}
+
+function answer(level){
+  // level: 0=wrong, 1=fuzzy, 2=correct
+  const item=currentQueue[currentIdx];
+  const id='w'+item.idx;
+  let c=state.cards[id]||{iv:1,rep:0,last:null};
+  
+  const t=today();
+  if(level===0){
+    c.iv=1;c.rep=0;
+  }else if(level===1){
+    // keep same interval
+    c.rep++;
+  }else{
+    if(c.iv<2)c.iv=2;
+    else if(c.iv<4)c.iv=4;
+    else if(c.iv<8)c.iv=8;
+    else if(c.iv<16)c.iv=16;
+    else c.iv=30;
+    c.rep++;
+  }
+  c.last=t;
+  state.cards[id]=c;
+  
+  if(item.isNew)state.todayNew++;
+  else state.todayRev++;
+  
+  if(item.isNew)sessionNew++;
+  else sessionRev++;
+  
+  updateStreak();
+  saveState();
+  
+  currentIdx++;
+  showCard();
+}
+
+function showDone(){
+  document.getElementById('fc-area').style.display='none';
+  document.getElementById('fc-btns').style.display='none';
+  document.getElementById('fc-done').style.display='';
+  document.getElementById('fc-summary').textContent=
+    `本次学习：${sessionNew}个新词 + ${sessionRev}个复习`;
+}
+
+function updateCardUI(){
+  const total=currentQueue.length;
+  const done=currentIdx;
+  document.getElementById('fc-count').textContent=`${done} / ${total}`;
+  document.getElementById('fc-new-count').textContent=`新词: ${sessionNew} | 复习: ${sessionRev}`;
+  const pct=total>0?(done/total*100):0;
+  document.getElementById('fc-bar').style.width=pct+'%';
+}
+
+// ===== GRAMMAR =====
+function renderGrammar(){
+  const el=document.getElementById('grammar-list');
+  el.innerHTML=GRAMMAR.map((g,i)=>`
+    <div class="grammar-item" id="gi-${i}">
+      <div class="grammar-header" onclick="toggleGrammar(${i})">
+        <span>${g.t}</span>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="grammar-body">
+        <div class="grammar-desc">${g.d}</div>
+        ${g.ex.map(e=>`
+          <div class="grammar-ex">
+            <div class="en">${e[0]}</div>
+            <div class="cn">${e[1]}</div>
+            <div class="note">💡 ${e[2]}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleGrammar(i){
+  document.getElementById('gi-'+i).classList.toggle('open');
+}
+
+// ===== PLAN =====
+function renderPlan(){
+  const el=document.getElementById('plan-content');
+  const phases=[
+    {t:"第1阶段：打地基",sub:"第1-2月 · 基础词汇+语法骨架",items:[
+      "安装并设置好学习工具（本网页+DeepSeek）",
+      "学完前50个基础英语词汇（动词、连词、介词）",
+      "学完5个语法骨架（去语法页面学习）",
+      "学完50个AI核心术语（model, training, neural network...）",
+      "能看懂 The model is trained on a large dataset 这样的句子",
+      "Anki/本网页 连续学习30天",
+      "在 Google ML Glossary 上随机认出5个词条"
+    ]},
+    {t:"第2阶段：起飞",sub:"第3-4月 · 短语搭配+双语阅读",items:[
+      "学完所有Phase 2短语（based on, compared to...）",
+      "安装沉浸式翻译，开始双语对照阅读",
+      "用DeepSeek分析3篇技术文章中的难句",
+      "能大致读懂 The Batch Newsletter 的文章标题和主旨",
+      "打开GitHub热门项目README能看懂安装步骤",
+      "翻译工具使用频率降低到每段查1-2个词"
+    ]},
+    {t:"第3阶段：独立阅读",sub:"第5-6月 · 脱离翻译+实战阅读",items:[
+      "关闭翻译工具直接阅读英文AI博客",
+      "能读懂HuggingFace Blog文章70%以上内容",
+      "能阅读arXiv论文摘要(Abstract)并理解主旨",
+      "在Reddit/HN上阅读AI相关讨论帖",
+      "遇到新概念能直接阅读英文文档学习",
+      "累计掌握1000+词汇"
+    ]}
+  ];
+  
+  let learned=0;
+  for(let id in state.cards){if(state.cards[id].iv>=4)learned++;}
+  let curPhase=1;
+  if(learned>=100)curPhase=2;
+  if(learned>=V.length-20)curPhase=3;
+  
+  el.innerHTML='<div class="timeline">'+phases.map((p,pi)=>{
+    const phaseNum=pi+1;
+    const isDone=phaseNum<curPhase;
+    const isActive=phaseNum===curPhase;
+    return`
+      <div class="phase-block">
+        <div class="phase-dot ${isDone?'done':isActive?'active':''}"></div>
+        <div class="phase-title" style="color:${isDone?'var(--accent)':isActive?'#fff':'var(--text3)'}">
+          ${isDone?'✅ ':''}${p.t}
+        </div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px">${p.sub}</div>
+        ${p.items.map((item,ii)=>{
+          const mid='m'+pi+'_'+ii;
+          const checked=state.milestones[mid]||false;
+          return`<div class="milestone" onclick="toggleMilestone('${mid}',this)">
+            <input type="checkbox" ${checked?'checked':''} onclick="event.stopPropagation()">
+            <span>${item}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    `;
+  }).join('')+'</div>';
+}
+
+function toggleMilestone(id,el){
+  const cb=el.querySelector('input');
+  cb.checked=!cb.checked;
+  state.milestones[id]=cb.checked;
+  saveState();
+}
+
+// ===== SETTINGS =====
+function renderSettings(){
+  document.getElementById('new-slider').value=state.settings.dailyNew;
+  document.getElementById('new-val').textContent=state.settings.dailyNew;
+  document.getElementById('rev-slider').value=state.settings.dailyReview;
+  document.getElementById('rev-val').textContent=state.settings.dailyReview;
+  
+  const toolsEl=document.getElementById('tools-list');
+  toolsEl.innerHTML=TOOLS.map(t=>`
+    <div class="tool-card">
+      <div class="tool-name">${t.n}</div>
+      <div class="tool-desc">${t.d}</div>
+      <div class="tool-tip">💡 ${t.tip}</div>
+      <a class="tool-url" href="${t.url}" target="_blank">🔗 打开链接</a>
+    </div>
+  `).join('');
+}
+
+function updateSetting(type,val){
+  val=parseInt(val);
+  if(type==='new'){
+    state.settings.dailyNew=val;
+    document.getElementById('new-val').textContent=val;
+  }else{
+    state.settings.dailyReview=val;
+    document.getElementById('rev-val').textContent=val;
+  }
+  saveState();
+}
+
+function showModal(){document.getElementById('modal').classList.add('show');}
+function hideModal(){document.getElementById('modal').classList.remove('show');}
+
+function resetAll(){
+  localStorage.removeItem(STORE_KEY);
+  state=defaultState();
+  hideModal();
+  go('home');
+}
+
+function exportData(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='ai-english-backup-'+today()+'.json';
+  a.click();URL.revokeObjectURL(url);
+}
+
+function importData(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      state=JSON.parse(ev.target.result);
+      saveState();
+      go('home');
+    }catch(err){
+      // show error inline instead of alert
+      const el=document.createElement('div');
+      el.style.cssText='position:fixed;top:20px;left:20px;right:20px;background:var(--err);color:#fff;padding:12px;border-radius:8px;z-index:300;text-align:center';
+      el.textContent='❌ 文件格式错误，导入失败';
+      document.body.appendChild(el);
+      setTimeout(()=>el.remove(),3000);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+}
+
+// ===== INIT =====
+refreshHome();
+</script>
+</body>
+</html>
